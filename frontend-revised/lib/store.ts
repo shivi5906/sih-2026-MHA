@@ -2,7 +2,7 @@
 import type { CaseDetail, Address, NormalizedTx, AttributionHypothesis, Evidence } from './types';
 
 // Mock data
-const mockCases: CaseDetail[] = Array.from({ length: 45 }, (_, i) => ({
+const mockCases: CaseDetail[] = Array.from({ length: 8 }, (_, i) => ({
   id: `case-${i + 1}`,
   number: `VAULT-${String(i + 1).padStart(5, '0')}`,
   title: `Investigation ${i + 1}: ${['High-value theft', 'Mixer cluster', 'Exchange fraud', 'Cross-chain trace', 'Darkweb link'][i % 5]}`,
