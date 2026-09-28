@@ -1,0 +1,19 @@
+Metadata-Version: 2.4
+Name: vaultx
+Version: 0.1.0
+Summary: VAULT-X blockchain tracing engine
+Requires-Python: >=3.11
+Requires-Dist: aiohttp
+Requires-Dist: fastapi
+Requires-Dist: uvicorn[standard]
+Requires-Dist: pydantic>=2
+Requires-Dist: sqlalchemy>=2
+Requires-Dist: pyyaml
+Requires-Dist: pandas
+Requires-Dist: jinja2
+Requires-Dist: sse-starlette
+Requires-Dist: networkx
+Requires-Dist: python-dotenv
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-asyncio; extra == "dev"

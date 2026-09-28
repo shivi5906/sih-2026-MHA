@@ -1,0 +1,15 @@
+aiohttp
+fastapi
+uvicorn[standard]
+pydantic>=2
+sqlalchemy>=2
+pyyaml
+pandas
+jinja2
+sse-starlette
+networkx
+python-dotenv
+
+[dev]
+pytest
+pytest-asyncio
