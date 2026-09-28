@@ -3,12 +3,20 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vault-x"
+name = "vaultx"
 version = "0.1.0"
 description = "VAULT-X blockchain tracing engine"
 requires-python = ">=3.11"
 dependencies = [
     "aiohttp",
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2",
+    "sqlalchemy>=2",
+    "pyyaml",
+    "pandas",
+    "jinja2",
+    "sse-starlette",
     "networkx",
     "python-dotenv",
 ]
