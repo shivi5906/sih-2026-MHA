@@ -3,8 +3,6 @@
 import { useState } from 'react';
 import { Menu, X, LogOut, ChevronDown, LayoutList, Plus, Network, FileCheck2, Building2, ScrollText, FileText, Send, Bot } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { store } from '@/lib/store';
-import type { CaseDetail } from '@/lib/types';
 
 export type WorkspaceView = 'list' | 'create' | 'detail' | 'evidence' | 'vasp' | 'audit' | 'report' | 'sahyog';
 
@@ -30,7 +28,7 @@ export function AppShell({ children, currentCaseId }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const currentCase = currentCaseId ? store.getCaseById(currentCaseId) : null;
+  const currentCase = null;
 
   const handleLogout = () => {
     logout();
