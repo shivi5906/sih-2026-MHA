@@ -20,4 +20,4 @@ def test_bitfinex_case_data_has_one_labeled_january_row():
     assert labels[0].metadata["peerCategory"] == "exchange"
     assert labels[0].to == "15vrWRtHMaqhE54yPucDFZHs8a4BZVKVMn"
     assert labels[0].metadata["peerCluster"] == "1NTo6BEU7jciqhFMGWGjEKXegtdPyJtbrj"
-    assert labels[0].amount == Decimal("4.176595")
+    assert labels[0].amount == Decimal("4.17659523")
