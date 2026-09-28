@@ -32,10 +32,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user: mockUser,
       token: mockToken,
     });
+    window.localStorage.setItem('vault-x-role', role);
   };
 
   const logout = () => {
     setSession(null);
+    window.localStorage.removeItem('vault-x-role');
   };
 
   return (

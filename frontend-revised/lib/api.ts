@@ -1,10 +1,11 @@
 export type CaseSummary = { id: string; number: string; title: string; status: string };
-export type GraphResponse = { nodes: Array<{ id: string; label: string; data?: Record<string, unknown> }>; edges: Array<{ id: string; source: string; target: string; data?: Record<string, unknown>; epistemicLabel?: string }>; banner: string };
+export type GraphResponse = { nodes: Array<{ id: string; label: string; data?: Record<string, unknown> }>; edges: Array<{ id: string; source: string; target: string; data?: Record<string, unknown>; epistemicLabel?: string }>; banner: string; renderedEdges?: number; totalEdges?: number; truncated?: boolean };
 export type Attribution = { id: string; hypothesis: string; score: number; band: string; epistemicLabel: string; supporting: string[]; contradicting: string[]; nextActions: string[] };
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 export class ApiOfflineError extends Error { constructor() { super('API offline'); } }
 async function fetchApi<T>(path: string, init: RequestInit = {}): Promise<T> {
-  try { const response = await fetch(`${API_URL}/api/v1${path}`, { ...init, headers: { 'Content-Type': 'application/json', ...init.headers } }); if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`); return response.json() as Promise<T>; }
+  const role = typeof window === 'undefined' ? 'Analyst' : window.localStorage.getItem('vault-x-role') ?? 'Analyst';
+  try { const response = await fetch(`${API_URL}/api/v1${path}`, { ...init, headers: { 'Content-Type': 'application/json', 'X-Role': role, ...init.headers } }); if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`); return response.json() as Promise<T>; }
   catch (error) { if (error instanceof TypeError) throw new ApiOfflineError(); throw error; }
 }
 export const api = {
