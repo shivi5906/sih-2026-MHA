@@ -1,0 +1,11 @@
+version: 0.1.0
+prior_log_odds: -0.60
+signal_weights:
+  known_deposit_match: 2.80
+  hot_wallet_forward: 3.00
+  sweep_fan_out: 0.40
+  contradiction: -0.90
+tier_multipliers: {A: 1.0, B: 0.65, C: 0.35}
+diminishing_returns: [1.0, 0.5, 0.25]
+abstention_threshold: 0.30
+band_cutoffs: {HIGH: 0.75, MEDIUM: 0.45, LOW: 0.30}

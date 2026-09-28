@@ -59,6 +59,10 @@ class Evidence(CamelModel):
     description: str
     verified: bool
     hash: str
+    tx_refs: list[str] = Field(default_factory=list)
+    source_tier: str = "C"
+    independence_group: str = "default"
+    epistemic_label: str = "OBSERVED"
 
 
 class Hypothesis(CamelModel):
@@ -71,6 +75,10 @@ class Hypothesis(CamelModel):
     signals: list[dict[str, Any]] = Field(default_factory=list)
     contradictions: list[str] = Field(default_factory=list)
     next_actions: list[str] = Field(default_factory=list)
+    supporting: list[str] = Field(default_factory=list)
+    contradicting: list[str] = Field(default_factory=list)
+    band: str = "INSUFFICIENT"
+    calibrated: bool = False
 
 
 class RunManifest(CamelModel):
@@ -79,6 +87,8 @@ class RunManifest(CamelModel):
     trace_steps: list[dict[str, Any]] = Field(default_factory=list)
     completed_at: int | None = None
     status: str
+    scoring_config_sha256: str | None = None
+    calibrated: bool = False
 
 
 class GraphNode(CamelModel):
