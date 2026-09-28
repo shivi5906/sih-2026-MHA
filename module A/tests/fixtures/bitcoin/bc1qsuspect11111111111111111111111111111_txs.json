@@ -1,0 +1,98 @@
+[
+  {
+    "txid": "btc_tx1",
+    "version": 1,
+    "locktime": 0,
+    "vin": [
+      {
+        "txid": "btc_tx0",
+        "vout": 0,
+        "prevout": {
+          "scriptpubkey": "0014abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
+          "scriptpubkey_asm": "OP_0 OP_PUSHBYTES_20 abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
+          "scriptpubkey_type": "v0_p2wpkh",
+          "scriptpubkey_address": "bc1qfunder44444444444444444444444444444",
+          "value": 60000
+        },
+        "scriptsig": "",
+        "scriptsig_asm": "",
+        "witness": ["abcd", "efgh"],
+        "is_coinbase": false,
+        "sequence": 4294967295
+      }
+    ],
+    "vout": [
+      {
+        "scriptpubkey": "00141111111111111111111111111111111111111111",
+        "scriptpubkey_asm": "OP_0 OP_PUSHBYTES_20 1111111111111111111111111111111111111111",
+        "scriptpubkey_type": "v0_p2wpkh",
+        "scriptpubkey_address": "bc1qsuspect11111111111111111111111111111",
+        "value": 50000
+      },
+      {
+        "scriptpubkey": "0014abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
+        "scriptpubkey_asm": "OP_0 OP_PUSHBYTES_20 abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
+        "scriptpubkey_type": "v0_p2wpkh",
+        "scriptpubkey_address": "bc1qfunder44444444444444444444444444444",
+        "value": 9500
+      }
+    ],
+    "size": 250,
+    "weight": 1000,
+    "fee": 500,
+    "status": {
+      "confirmed": true,
+      "block_height": 800000,
+      "block_hash": "0000000000000000000",
+      "block_time": 1700000000
+    }
+  },
+  {
+    "txid": "btc_tx2",
+    "version": 1,
+    "locktime": 0,
+    "vin": [
+      {
+        "txid": "btc_tx1",
+        "vout": 0,
+        "prevout": {
+          "scriptpubkey": "00141111111111111111111111111111111111111111",
+          "scriptpubkey_asm": "OP_0 OP_PUSHBYTES_20 1111111111111111111111111111111111111111",
+          "scriptpubkey_type": "v0_p2wpkh",
+          "scriptpubkey_address": "bc1qsuspect11111111111111111111111111111",
+          "value": 50000
+        },
+        "scriptsig": "",
+        "scriptsig_asm": "",
+        "witness": ["abcd", "efgh"],
+        "is_coinbase": false,
+        "sequence": 4294967295
+      }
+    ],
+    "vout": [
+      {
+        "scriptpubkey": "00142222222222222222222222222222222222222222",
+        "scriptpubkey_asm": "OP_0 OP_PUSHBYTES_20 2222222222222222222222222222222222222222",
+        "scriptpubkey_type": "v0_p2wpkh",
+        "scriptpubkey_address": "bc1qintermed2222222222222222222222222222",
+        "value": 40000
+      },
+      {
+        "scriptpubkey": "00143333333333333333333333333333333333333333",
+        "scriptpubkey_asm": "OP_0 OP_PUSHBYTES_20 3333333333333333333333333333333333333333",
+        "scriptpubkey_type": "v0_p2wpkh",
+        "scriptpubkey_address": "bc1qchange333333333333333333333333333333",
+        "value": 9500
+      }
+    ],
+    "size": 250,
+    "weight": 1000,
+    "fee": 500,
+    "status": {
+      "confirmed": true,
+      "block_height": 800010,
+      "block_hash": "0000000000000000001",
+      "block_time": 1700100000
+    }
+  }
+]

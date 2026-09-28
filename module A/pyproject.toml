@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vault-x"
+version = "0.1.0"
+description = "VAULT-X blockchain tracing engine"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp",
+    "networkx",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
