@@ -26,3 +26,7 @@ dev = [
     "pytest",
     "pytest-asyncio",
 ]
+
+[tool.setuptools.packages.find]
+include = ["vaultx*", "app*"]
+exclude = ["data*", "tests*"]
