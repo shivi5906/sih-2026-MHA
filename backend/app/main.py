@@ -11,6 +11,7 @@ from app.evidence_writer import verify_chain
 from app.sahyog import prepare
 
 app=FastAPI(title="VAULT-X", version="0.1.0")
+MAX_RENDERED_GRAPH_EDGES = 200
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000"], allow_methods=["*"], allow_headers=["*"])
 @app.on_event("startup")
 def startup(): init_db()
@@ -59,9 +60,42 @@ def _run(session,run_id):
     row=session.get(InvestigationRun,run_id)
     if not row: raise HTTPException(404,"run not found")
     return row
+
+def _graph_label(address: str, metadata: dict) -> str:
+    """Return a display label without changing the recorded address."""
+    if address.startswith("virtual:"):
+        return address.removeprefix("virtual:").replace("-", " ").title() + " (virtual)"
+    return metadata.get("peerName") or metadata.get("peerCategory") or f"{address[:10]}…{address[-6:]}"
+
+def _graph_overview_transactions(txs: list[Transaction]) -> list[Transaction]:
+    """Keep the replay overview responsive while representing each source dataset."""
+    groups: dict[str, list[Transaction]] = {}
+    for row in txs:
+        dataset=(row.payload.get("provenance") or {}).get("dataset", "recorded-transfers")
+        groups.setdefault(dataset, []).append(row)
+    per_group=max(1, MAX_RENDERED_GRAPH_EDGES // max(1, len(groups)))
+    overview: list[Transaction] = []
+    for rows in groups.values():
+        overview.extend(sorted(rows, key=lambda row: not bool((row.payload.get("metadata") or {}).get("peerName")))[:per_group])
+    return overview[:MAX_RENDERED_GRAPH_EDGES]
+
 @app.get("/api/v1/investigations/{run_id}/graph")
 def graph(run_id:str,session=Depends(db),role=Depends(actor)):
-    run=_run(session,run_id); txs=session.scalars(select(Transaction).where(Transaction.case_id==run.case_id)).all(); audit_read(session,role,"graph",run.case_id); return {"nodes":[],"edges":[x.payload for x in txs],"banner":"SNAPSHOT / CASE REPLAY"}
+    run=_run(session,run_id)
+    txs=session.scalars(select(Transaction).where(Transaction.case_id==run.case_id)).all()
+    rendered=_graph_overview_transactions(txs)
+    nodes: dict[str, dict] = {}
+    edges: list[dict] = []
+    for row in rendered:
+        payload=row.payload
+        source, target = payload["from"], payload["to"]
+        metadata=payload.get("metadata") or {}
+        for address in (source, target):
+            if address not in nodes:
+                nodes[address]={"id":address,"label":_graph_label(address, metadata),"data":{"address":address,"chain":payload.get("chain"),"epistemicLabel":payload.get("epistemicLabel", "OBSERVED")}}
+        edges.append({"id":payload["id"],"source":source,"target":target,"data":{"amount":payload.get("amount"),"asset":payload.get("asset", "BTC"),"timestamp":payload.get("timestamp"),"transactionId":payload["txHash"],"provenance":payload.get("provenance", {})},"epistemicLabel":payload.get("epistemicLabel", "OBSERVED")})
+    audit_read(session,role,"graph",run.case_id)
+    return {"nodes":list(nodes.values()),"edges":edges,"banner":"SNAPSHOT / CASE REPLAY","renderedEdges":len(edges),"totalEdges":len(txs),"truncated":len(txs)>len(edges)}
 @app.get("/api/v1/investigations/{run_id}/attribution")
 def attribution(run_id:str,session=Depends(db),role=Depends(actor)):
     run=_run(session,run_id); rows=session.scalars(select(HypothesisRecord).where(HypothesisRecord.case_id==run.case_id)).all(); audit_read(session,role,"attribution",run.case_id); return [x.payload for x in rows]
@@ -91,7 +125,7 @@ def report_html(report_id:str,session=Depends(db),role=Depends(actor)):
     return Template("<main><h1>{{ r.banner }}</h1><h2>Methodology</h2><p>{{ r.methodology }}</p><p>Scoring YAML: {{ r.scoringYamlHash }}</p><p>Chain head: {{ r.chainHeadHash }}</p><h2>Data quality</h2><pre>{{ r.dataQualityIssues }}</pre></main>").render(r=row.content)
 @app.get("/api/v1/audit")
 def audit(session=Depends(db),role=Depends(actor)):
-    require(role,{"Auditor","Supervisor"}); return [{"id":x.id,"who":x.actor,"what":x.action,"resource":x.resource,"result":x.result,"integrityHash":x.integrity_hash} for x in session.scalars(select(__import__('app.database',fromlist=['AuditEvent']).AuditEvent)).all()]
+    require(role,{"Auditor","Supervisor"}); return [{"id":x.id,"caseId":x.case_id,"who":x.actor,"what":x.action,"resource":x.resource,"result":x.result,"occurredAt":x.occurred_at.isoformat(),"integrityHash":x.integrity_hash} for x in session.scalars(select(__import__('app.database',fromlist=['AuditEvent']).AuditEvent).order_by(__import__('app.database',fromlist=['AuditEvent']).AuditEvent.occurred_at.desc())).all()]
 @app.get("/api/v1/intel/vasps")
 def vasps(): return {"items":[{"name":"Xzzx.biz","sourceTier":"C","verified":False}]}
 @app.post("/api/v1/attributions/{attribution_id}/sahyog/prepare")
