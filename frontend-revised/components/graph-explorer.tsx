@@ -8,6 +8,7 @@ import cytoscape from 'cytoscape';
 import coseBilkent from 'cytoscape-cose-bilkent';
 import { CaseDetailHeader } from './case-detail-header';
 import { AttributionPanel } from './attribution-panel';
+import { OsintPanel } from './osint-panel';
 
 try {
   cytoscape.use(coseBilkent);
@@ -31,6 +32,8 @@ export function GraphExplorer({ runId }: { runId?: string }) {
   const [min, setMin] = useState('0');
   const [label, setLabel] = useState('');
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [mode, setMode] = useState<'graph' | 'split'>('graph');
+  const [focusNotice, setFocusNotice] = useState('');
   const cyRef = useRef<any>(null);
 
   useEffect(() => {
@@ -90,6 +93,29 @@ export function GraphExplorer({ runId }: { runId?: string }) {
 
   const zoom = (factor: number) => cyRef.current?.zoom(cyRef.current.zoom() * factor);
 
+  // Re-fit after the graph data arrives and whenever the container width changes (split view, side panel).
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      cyRef.current?.resize();
+      cyRef.current?.fit(undefined, 40);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [elements, mode, rightPanelOpen]);
+
+  const focusAddress = (address: string) => {
+    const cy = cyRef.current;
+    const node = cy?.getElementById(address);
+    if (!cy || !node || node.empty()) {
+      setFocusNotice(`${address.slice(0, 12)}… is not in the rendered graph. Reset filters, or it may be outside the rendered overview.`);
+      return;
+    }
+    setFocusNotice('');
+    cy.elements().unselect();
+    node.select();
+    cy.animate({ center: { eles: node }, zoom: Math.max(cy.zoom(), 1.2) }, { duration: 400 });
+    setSelected(node.data());
+  };
+
   return (
     <div className="space-y-4">
       <CaseDetailHeader 
@@ -98,8 +124,23 @@ export function GraphExplorer({ runId }: { runId?: string }) {
       />
       
       {error && <div className="border border-red-800 bg-red-950/30 p-3 font-mono text-xs text-red-300">{error}</div>}
-      
-      <div className={`grid gap-4 ${rightPanelOpen ? 'lg:grid-cols-[1fr_320px]' : 'grid-cols-1'}`}>
+
+      <div className="flex flex-wrap items-center gap-1 border-b border-slate-800">
+        {([['graph', 'GRAPH VIEW'], ['split', 'SPLIT VIEW: GRAPH + OSINT']] as const).map(([key, name]) => (
+          <button
+            key={key}
+            onClick={() => setMode(key)}
+            className={`px-3 py-2 font-mono text-[10px] tracking-wider transition-colors ${
+              mode === key ? 'border-b-2 border-cyan-400 bg-cyan-950/40 font-bold text-cyan-200' : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            {name}
+          </button>
+        ))}
+        <span className="ml-auto pb-1 font-mono text-[9px] text-slate-500">OSINT runs on the highest-scoring attributed VASPs · UNCALIBRATED</span>
+      </div>
+
+      <div className={`grid gap-4 ${mode === 'split' ? 'xl:grid-cols-2' : rightPanelOpen ? 'lg:grid-cols-[1fr_320px]' : 'grid-cols-1'}`}>
         <Panel title="GRAPH VISUALIZATION">
           {/* Toolbar */}
           <div className="mb-4 flex flex-wrap items-end gap-3 rounded border border-slate-800 bg-slate-900/50 p-2">
@@ -168,13 +209,17 @@ export function GraphExplorer({ runId }: { runId?: string }) {
                 stylesheet={cytoscapeStylesheet as any} 
                 cy={cy => {
                   cyRef.current = cy;
+                  cy.off('tap', 'node');
                   cy.on('tap', 'node', event => setSelected(event.target.data()));
+                  // cose-bilkent ignores its own fit option, so fit once each layout finishes.
+                  cy.off('layoutstop');
+                  cy.on('layoutstop', () => cy.fit(undefined, 40));
                 }}
               />
             )}
             
             {/* Toggle Panel Button overlay */}
-            <button 
+            {mode === 'graph' && <button 
               onClick={() => setRightPanelOpen(!rightPanelOpen)}
               className="absolute top-2 right-2 border border-slate-600 bg-slate-800/80 p-1.5 text-slate-300 hover:bg-slate-700 hover:text-cyan-300 z-10 rounded backdrop-blur-sm"
               title={rightPanelOpen ? "Close Details Panel" : "Open Details Panel"}
@@ -184,12 +229,28 @@ export function GraphExplorer({ runId }: { runId?: string }) {
               ) : (
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
               )}
-            </button>
+            </button>}
           </div>
+          {focusNotice && <div className="mt-2 border border-amber-800 bg-amber-950/30 p-2 font-mono text-[10px] text-amber-300">{focusNotice}</div>}
+          {mode === 'split' && selected && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 border border-slate-800 bg-slate-900/60 p-2 font-mono text-[10px]">
+              <span className="text-slate-500">SELECTED</span>
+              <span className="font-bold text-cyan-300">{String(selected.label || 'Unknown')}</span>
+              {selected.address ? <span className="break-all text-slate-400">{String(selected.address)}</span> : null}
+            </div>
+          )}
         </Panel>
 
+        {mode === 'split' && (
+          <Panel title="OSINT INTELLIGENCE">
+            <div className="max-h-[820px] overflow-y-auto pr-1">
+              <OsintPanel runId={runId} onFocusAddress={focusAddress} />
+            </div>
+          </Panel>
+        )}
+
         {/* Right Panel */}
-        {rightPanelOpen && (
+        {mode === 'graph' && rightPanelOpen && (
           <div className="flex flex-col gap-4">
             <Panel title="NODE DETAILS">
               {selected ? (

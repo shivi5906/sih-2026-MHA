@@ -1,10 +1,14 @@
 pyproject.toml
 app/__init__.py
 app/audit.py
+app/auth_service.py
 app/database.py
 app/evidence_writer.py
 app/main.py
+app/neo4j_client.py
+app/osint.py
 app/sahyog.py
+app/trace_runner.py
 tests/test_attribution.py
 tests/test_casedata.py
 tests/test_detection.py
@@ -12,6 +16,7 @@ tests/test_evidence_writer.py
 tests/test_graph.py
 tests/test_new_features.py
 tests/test_normalization.py
+tests/test_osint.py
 tests/test_taint.py
 tests/test_tracing.py
 vaultx/__init__.py

@@ -13,6 +13,7 @@ from app.sahyog import prepare
 from app.trace_runner import run_trace
 from app.auth_service import verify_password, create_access_token, decode_token, seed_default_users
 from app.neo4j_client import get_neo4j_client
+from app.osint import build_osint_report
 import os
 
 logger = logging.getLogger(__name__)
@@ -187,6 +188,15 @@ def graph_shortest_path(from_addr: str, to_addr: str, role=Depends(actor)):
 def graph_neighborhood(address: str, depth: int = 2, role=Depends(actor)):
     neo4j_client = get_neo4j_client()
     return neo4j_client.get_neighborhood(address, depth)
+@app.get("/api/v1/investigations/{run_id}/osint")
+def osint(run_id:str,session=Depends(db),role=Depends(actor)):
+    run=_run(session,run_id)
+    hypotheses=[x.payload for x in session.scalars(select(HypothesisRecord).where(HypothesisRecord.case_id==run.case_id)).all()]
+    txs=[x.payload for x in session.scalars(select(Transaction).where(Transaction.case_id==run.case_id)).all()]
+    audit_read(session,role,"osint",run.case_id)
+    manifest=run.manifest or {}
+    banner="FIXTURE TRACE (TEST DATA)" if (manifest.get("traceResult") or {}).get("mode")=="fixture" else manifest.get("banner","")
+    return build_osint_report(run.id,banner,hypotheses,txs)
 @app.get("/api/v1/investigations/{run_id}/attribution")
 def attribution(run_id:str,session=Depends(db),role=Depends(actor)):
     run=_run(session,run_id); rows=session.scalars(select(HypothesisRecord).where(HypothesisRecord.case_id==run.case_id)).all(); audit_read(session,role,"attribution",run.case_id); return [x.payload for x in rows]
