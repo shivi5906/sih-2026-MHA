@@ -665,15 +665,16 @@ VAULT-X is designed for use by authorised law-enforcement personnel within appli
 
 ## 39. Team
 
-| Name | Role | Contact |
-|---|---|---|
-| _TBD_ | Team lead / architecture | |
-| _TBD_ | Backend / blockchain | |
-| _TBD_ | Frontend / graph UX | |
-| _TBD_ | Intelligence / data | |
-| _TBD_ | Security / DevOps | |
+| Name | Role | 
+|---|---|
+| Shivam Sharma | Team lead / architecture | |
+| Rohan Goyal   | Backend / blockchain     | |
+| Medha Jha     | Frontend / graph UX      | |
+| Kabir Arora   | Intelligence / data      | |
+| Arya Shekhar  | Security / DevOps        | |
+| Siddhi Suryavanshi| Security / DevOps        | |
 
-Mentor / institution: _TBD_
+Mentor / institution: Dr. Alka Singhal / JIIT Noida 
 
 ## 40. License
 
