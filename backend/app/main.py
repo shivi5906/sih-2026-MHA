@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from jinja2 import Template
 from sqlalchemy import select
 from app.audit import log
+import hashlib
 from app.database import Case, EvidenceRecord, HypothesisRecord, InvestigationRun, Report, SahyogRequest, SessionLocal, SuspectWallet, Transaction, User, init_db
 from app.evidence_writer import verify_chain
 from app.sahyog import prepare
@@ -22,7 +23,7 @@ from app.osint import build_osint_report
 from app.case_context import load_case_context
 from app.database import GeneratedDocument
 from app.evidence_writer import append_evidence
-from app import mailer, notices
+from app import court_report, mailer, notices
 import os
 
 logger = logging.getLogger(__name__)
@@ -295,7 +296,19 @@ def create_notice(run_id: str, body: dict = Body(...), session=Depends(db), role
     except ValueError as e: raise HTTPException(422, str(e))
     doc = _store_document(session, ctx, "vasp_notice", built["title"], "DRAFT", built["pdf"], built["sha256"], built["meta"], role)
     return _doc_summary(doc)
-
+@app.post("/api/v1/investigations/{run_id}/court-report")
+@app.post("/investigations/{run_id}/court-report")
+def create_court_report(run_id: str, body: dict = Body(default_factory=dict), session=Depends(db), role=Depends(actor)):
+    """Generate an official Section 63 BSA court report PDF for the investigation run."""
+    require(role, INVESTIGATOR_ROLES)
+    ctx = load_case_context(session, run_id)
+    try:
+        built = court_report.create_court_report(ctx, body)
+    except Exception as e:
+        logger.exception("Failed to generate court report: %s", e)
+        raise HTTPException(422, str(e))
+    doc = _store_document(session, ctx, "court_report", built["title"], "FINAL", built["pdf"], built["sha256"], built["meta"], role)
+    return _doc_summary(doc)
 @app.get("/api/v1/investigations/{run_id}/documents")
 def list_documents(run_id: str, session=Depends(db), role=Depends(actor)):
     run = _run(session, run_id); audit_read(session, role, "documents", run.case_id)

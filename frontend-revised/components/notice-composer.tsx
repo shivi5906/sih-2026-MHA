@@ -14,8 +14,8 @@ function saveOfficer(officer: Officer) {
   try { window.localStorage.setItem(OFFICER_KEY, JSON.stringify(officer)); } catch { /* storage unavailable */ }
 }
 
-const inputCls = 'mt-1 block w-full border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white focus:border-cyan-500 focus:outline-none';
-const labelCls = 'font-mono text-[9px] uppercase tracking-wider text-slate-400';
+const inputCls = 'mt-1 block w-full border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white focus:border-cyan-500 focus:outline-none';
+const labelCls = 'font-mono text-xs uppercase tracking-wider text-slate-300 font-semibold';
 
 export async function openPdf(documentId: string, download = false, filename = 'document.pdf') {
   const url = await fetchPdfUrl(`/documents/${documentId}/pdf`);
@@ -35,7 +35,7 @@ export function StatusChip({ status }: { status: string }) {
     : status === 'SUBMITTED' ? 'border-cyan-600 text-cyan-300 bg-cyan-950/40'
     : status === 'QUEUED_OUTBOX' ? 'border-amber-600 text-amber-300 bg-amber-950/40'
     : 'border-slate-600 text-slate-300 bg-slate-900';
-  return <span className={`border px-1.5 py-0.5 font-mono text-[9px] ${tone}`}>{status.replace('_', ' ')}</span>;
+  return <span className={`border px-2 py-0.5 font-mono text-xs font-medium ${tone}`}>{status.replace('_', ' ')}</span>;
 }
 
 function DocumentCard({ doc, email, onSent }: { doc: DocumentSummary; email: EmailStatus | null; onSent: (d: DocumentSummary) => void }) {

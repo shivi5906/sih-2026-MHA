@@ -104,6 +104,8 @@ export const api = {
   noticeDrafts: (runId: string) => fetchApi<{ banner: string; email: EmailStatus; drafts: NoticeDraft[] }>(`/investigations/${runId}/notices/drafts`),
   createNotice: (runId: string, body: { targetId: string; targetAddress: string; recipientEmail: string; officer: Officer; deadlineDays: number; records: string[] }) =>
     fetchApi<DocumentSummary>(`/investigations/${runId}/notices`, { method: 'POST', body: JSON.stringify(body) }),
+  createCourtReport: (runId: string, body?: { officer?: Officer; courtName?: string; notes?: string; expert?: Officer }) =>
+    fetchApi<DocumentSummary>(`/investigations/${runId}/court-report`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
   documents: (runId: string) => fetchApi<DocumentSummary[]>(`/investigations/${runId}/documents`),
   sendDocument: (id: string, body: { channel: 'email' | 'sahyog'; confirmed: boolean; recipientEmail?: string }) =>
     fetchApi<DocumentSummary>(`/documents/${id}/send`, { method: 'POST', body: JSON.stringify(body) }),
