@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api, ApiOfflineError, OsintChannel, OsintReport, OsintTarget } from '@/lib/api';
+import { NoticeComposer } from './notice-composer';
 import { ColumnChart, EmptyChart, fmt, HBarChart, pct, ScoreRing, ShareBar, shortAddr, StatTile } from './osint-charts';
 
 const Section = ({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) => (
@@ -266,7 +267,7 @@ export function OsintPanel({ runId, onFocusAddress }: { runId?: string; onFocusA
   const [report, setReport] = useState<OsintReport | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [view, setView] = useState<'intel' | 'analytics'>('intel');
+  const [view, setView] = useState<'intel' | 'analytics' | 'notices'>('intel');
 
   const load = () => {
     if (!runId) return;
@@ -314,7 +315,7 @@ export function OsintPanel({ runId, onFocusAddress }: { runId?: string; onFocusA
           </div>
 
           <div className="flex gap-1 border-b border-slate-800 pb-2">
-            {([['intel', 'INTELLIGENCE'], ['analytics', 'GRAPH ANALYTICS']] as const).map(([key, name]) => (
+            {([['intel', 'INTELLIGENCE'], ['analytics', 'GRAPH ANALYTICS'], ['notices', 'NOTICES TO VASP']] as const).map(([key, name]) => (
               <button key={key} onClick={() => setView(key)}
                 className={`px-2 py-1 font-mono text-[10px] transition-colors ${view === key ? 'border-b-2 border-teal-500 bg-teal-950/50 font-bold text-teal-300' : 'text-slate-500 hover:text-slate-300'}`}>
                 {name}
@@ -322,7 +323,9 @@ export function OsintPanel({ runId, onFocusAddress }: { runId?: string; onFocusA
             ))}
           </div>
 
-          {view === 'intel' ? <Intelligence key={report.generatedAt} report={report} onFocus={onFocusAddress} /> : <Analytics report={report} onFocus={onFocusAddress} />}
+          {view === 'intel' && <Intelligence key={report.generatedAt} report={report} onFocus={onFocusAddress} />}
+          {view === 'analytics' && <Analytics report={report} onFocus={onFocusAddress} />}
+          {view === 'notices' && <NoticeComposer runId={runId} />}
 
           <p className="border-t border-slate-800 pt-2 text-[10px] leading-relaxed text-slate-500">{report.disclaimer}</p>
         </>

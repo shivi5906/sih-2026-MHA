@@ -28,7 +28,20 @@ export type OsintReport = {
   summary: { targets: number; highPriority: number; channelsFound: number; channelsChecked: number; hypothesesConsidered: number };
   targets: OsintTarget[]; graphAnalytics: GraphAnalytics; disclaimer: string;
 };
-export type InvestigationResult ={ id: string; status: string; manifest?: Record<string, unknown>; error?: string };
+export type DocumentSummary = {
+  id: string; caseId: string; runId: string; kind: 'vasp_notice' | 'court_report'; title: string; status: string; sha256: string;
+  createdBy: string; createdAt: string | null; sizeBytes: number; meta: Record<string, any>;
+};
+export type NoticeDraft = {
+  targetId: string; vasp: string; targetAddress: string; chain: string | null; attributionScore: number; band: string; priority: string; website: string | null;
+  recipient: { email: string | null; portal: string | null; verified: boolean; source: string | null };
+  channels: OsintChannel[]; inflow: OsintTarget['inflow']; suggestedRecords: string[]; legalBasis: string; calibrated: boolean;
+};
+export type EmailStatus = { mode: 'smtp' | 'outbox'; configured: boolean; host: string | null; port: number; sender: string | null };
+export type SahyogStatus = { mode: 'mock' | 'live'; configured: boolean; baseUrl?: string | null; auth?: string; health?: Record<string, unknown> | null; [key: string]: unknown };
+export type IntegrationsStatus = { email: EmailStatus; sahyog: SahyogStatus };
+export type Officer = { name?: string; rank?: string; unit?: string; email?: string; phone?: string };
+export type InvestigationResult = { id: string; status: string; manifest?: Record<string, unknown>; error?: string };
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 export class ApiOfflineError extends Error { constructor() { super('API offline'); } }
 async function fetchApi<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -55,6 +68,28 @@ async function fetchApi<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw error; 
   }
 }
+/** Error text for display: the API's "detail" message when present. */
+export function apiErrorMessage(error: unknown): string {
+  if (error instanceof ApiOfflineError) return 'API offline. Start the backend and try again.';
+  const text = error instanceof Error ? error.message : String(error);
+  const match = text.match(/^\d+: ([\s\S]*)$/);
+  if (match) {
+    try { const body = JSON.parse(match[1]); if (typeof body.detail === 'string') return body.detail; } catch { /* not JSON */ }
+    return match[1];
+  }
+  return text;
+}
+/** Fetches a PDF with the session's auth headers and returns an object URL for viewing or download. */
+export async function fetchPdfUrl(path: string): Promise<string> {
+  const role = window.localStorage.getItem('vault-x-role') ?? 'Analyst';
+  const token = window.localStorage.getItem('vault-x-token');
+  const headers: Record<string, string> = { 'X-Role': role };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let response: Response;
+  try { response = await fetch(`${API_URL}/api/v1${path}`, { headers }); } catch { throw new ApiOfflineError(); }
+  if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
+  return URL.createObjectURL(await response.blob());
+}
 export const api = {
   login: (email: string, password: string, role: string) => fetchApi<Record<string, unknown>>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password, role }) }),
   me: () => fetchApi<{id: string; name: string; email: string; role: string}>('/auth/me'),
@@ -65,5 +100,12 @@ export const api = {
   attribution: (runId: string) => fetchApi<Attribution[]>(`/investigations/${runId}/attribution`),
   osint: (runId: string) => fetchApi<OsintReport>(`/investigations/${runId}/osint`),
   evidence: () => fetchApi<Array<Record<string, unknown>>>('/evidence'), verifyEvidence: (id: string) => fetchApi<{ valid: boolean; firstBrokenLink?: string }>(`/evidence/${id}/verify`), audit: () => fetchApi<Array<Record<string, unknown>>>('/audit'), vasps: () => fetchApi<{ items: Array<Record<string, unknown>> }>('/intel/vasps'), reports: (runId: string) => fetchApi<Array<Record<string, unknown>>>(`/investigations/${runId}/reports`),
+  integrationsStatus: () => fetchApi<IntegrationsStatus>('/integrations/status'),
+  noticeDrafts: (runId: string) => fetchApi<{ banner: string; email: EmailStatus; drafts: NoticeDraft[] }>(`/investigations/${runId}/notices/drafts`),
+  createNotice: (runId: string, body: { targetId: string; targetAddress: string; recipientEmail: string; officer: Officer; deadlineDays: number; records: string[] }) =>
+    fetchApi<DocumentSummary>(`/investigations/${runId}/notices`, { method: 'POST', body: JSON.stringify(body) }),
+  documents: (runId: string) => fetchApi<DocumentSummary[]>(`/investigations/${runId}/documents`),
+  sendDocument: (id: string, body: { channel: 'email' | 'sahyog'; confirmed: boolean; recipientEmail?: string }) =>
+    fetchApi<DocumentSummary>(`/documents/${id}/send`, { method: 'POST', body: JSON.stringify(body) }),
   prepareSahyog: (id: string) => fetchApi<Record<string, unknown>>(`/attributions/${id}/sahyog/prepare`, { method: 'POST' }), approveSahyog: (id: string) => fetchApi<Record<string, unknown>>(`/attributions/${id}/sahyog/approve`, { method: 'POST' }),
 };

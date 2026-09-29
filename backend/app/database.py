@@ -1,7 +1,7 @@
 from __future__ import annotations
 import os
 from datetime import datetime, timezone
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, create_engine, Index
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, create_engine, Index
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, relationship
 
 DB_URL = os.getenv("VAULTX_DATABASE_URL", "postgresql+psycopg2://vaultx:vaultx-dev@localhost:5432/vaultx")
@@ -119,6 +119,25 @@ class SahyogRequest(Base):
     attribution_id: Mapped[str] = mapped_column(String)
     payload: Mapped[dict] = mapped_column(JSON)
     status: Mapped[str] = mapped_column(String)
+
+class GeneratedDocument(Base):
+    """Generated PDFs (VASP notices, court reports). The stored bytes are what the SHA-256 attests to."""
+    __tablename__ = "generated_documents"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    case_id: Mapped[str] = mapped_column(ForeignKey("cases.id"))
+    run_id: Mapped[str] = mapped_column(String)
+    kind: Mapped[str] = mapped_column(String)
+    title: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String)
+    sha256: Mapped[str] = mapped_column(String)
+    created_by: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+    meta: Mapped[dict] = mapped_column(JSON)
+    pdf: Mapped[bytes] = mapped_column(LargeBinary)
+
+    __table_args__ = (
+        Index("ix_generated_documents_case_id", "case_id"),
+    )
 
 class AuditEvent(Base):
     __tablename__ = "audit_events"

@@ -1,0 +1,10 @@
+{
+  "_readme": "Law-enforcement contact points per VASP, keyed by lowercase VASP name. Fill lawEnforcementEmail / lawEnforcementPortal only with contacts verified by your unit. Point VASP_CONTACTS_FILE in .env at your own copy to override this file.",
+  "binance": {"displayName": "Binance", "website": "https://www.binance.com", "lawEnforcementEmail": null, "lawEnforcementPortal": null, "verified": false},
+  "coinbase": {"displayName": "Coinbase", "website": "https://www.coinbase.com", "lawEnforcementEmail": null, "lawEnforcementPortal": null, "verified": false},
+  "kraken": {"displayName": "Kraken", "website": "https://www.kraken.com", "lawEnforcementEmail": null, "lawEnforcementPortal": null, "verified": false},
+  "okx": {"displayName": "OKX", "website": "https://www.okx.com", "lawEnforcementEmail": null, "lawEnforcementPortal": null, "verified": false},
+  "huobi": {"displayName": "HTX (formerly Huobi)", "website": "https://www.htx.com", "lawEnforcementEmail": null, "lawEnforcementPortal": null, "verified": false},
+  "bitfinex": {"displayName": "Bitfinex", "website": "https://www.bitfinex.com", "lawEnforcementEmail": null, "lawEnforcementPortal": null, "verified": false},
+  "xzzx.biz": {"displayName": "Xzzx.biz", "website": null, "lawEnforcementEmail": null, "lawEnforcementPortal": null, "verified": false}
+}

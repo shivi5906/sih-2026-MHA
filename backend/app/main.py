@@ -1,9 +1,14 @@
 from __future__ import annotations
 import logging
 import uuid
-from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
+from datetime import datetime, timezone
+from pathlib import Path
+from dotenv import load_dotenv
+# Load backend/.env before any module reads configuration (database URL, SMTP, SAHYOG).
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+from fastapi import BackgroundTasks, Body, Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from jinja2 import Template
 from sqlalchemy import select
 from app.audit import log
@@ -14,6 +19,10 @@ from app.trace_runner import run_trace
 from app.auth_service import verify_password, create_access_token, decode_token, seed_default_users
 from app.neo4j_client import get_neo4j_client
 from app.osint import build_osint_report
+from app.case_context import load_case_context
+from app.database import GeneratedDocument
+from app.evidence_writer import append_evidence
+from app import mailer, notices
 import os
 
 logger = logging.getLogger(__name__)
@@ -237,3 +246,100 @@ def sahyog_approve(attribution_id:str,session=Depends(db),role=Depends(actor)):
     require(role,{"Supervisor"}); item=session.scalars(select(SahyogRequest).where(SahyogRequest.attribution_id==attribution_id)).first()
     if not item: raise HTTPException(404,"mock request not found")
     item.status="mock_acknowledged"; log(session,role,"write","sahyog-mock","approved"); return {"id":item.id,"status":item.status,"mock":True}
+
+# ---------------------------------------------------------------------------
+# Generated documents: VASP notices and court reports
+# ---------------------------------------------------------------------------
+INVESTIGATOR_ROLES = {"Analyst", "Senior Investigator", "Supervisor"}
+
+def _doc_summary(d: GeneratedDocument) -> dict:
+    return {"id": d.id, "caseId": d.case_id, "runId": d.run_id, "kind": d.kind, "title": d.title, "status": d.status, "sha256": d.sha256,
+            "createdBy": d.created_by, "createdAt": d.created_at.isoformat(timespec="seconds") if d.created_at else None,
+            "sizeBytes": len(d.pdf or b""), "meta": d.meta}
+
+def _store_document(session, ctx, kind: str, title: str, status: str, pdf: bytes, sha256: str, meta: dict, role: str) -> GeneratedDocument:
+    doc = GeneratedDocument(id=f"DOC-{uuid.uuid4().hex[:16]}", case_id=ctx.case.id, run_id=ctx.run.id, kind=kind, title=title, status=status,
+                            sha256=sha256, created_by=role, meta=meta, pdf=pdf)
+    session.add(doc)
+    # Record the document hash in the case evidence chain so later tampering is detectable.
+    append_evidence(session, ctx.case.id, {"type": f"generated_{kind}", "source": "vaultx-document-engine", "description": f"{title} generated; SHA-256 {sha256}.",
+                                          "sourceTier": "A", "independenceGroup": "generated-documents", "epistemicLabel": "OBSERVED", "txRefs": [], "documentId": doc.id},
+                    {"documentId": doc.id, "sha256": sha256})
+    log(session, role, "write", kind, "generated", ctx.case.id)
+    return doc
+
+def _get_document(session, document_id: str) -> GeneratedDocument:
+    doc = session.get(GeneratedDocument, document_id)
+    if not doc: raise HTTPException(404, "document not found")
+    return doc
+
+@app.get("/api/v1/integrations/status")
+def integrations_status(role=Depends(actor)):
+    try:
+        from app.sahyog_client import public_sahyog_status
+        sahyog = public_sahyog_status()
+    except ImportError:
+        sahyog = {"mode": "mock", "configured": False}
+    return {"email": mailer.public_email_status(), "sahyog": sahyog}
+
+@app.get("/api/v1/investigations/{run_id}/notices/drafts")
+def notice_drafts(run_id: str, session=Depends(db), role=Depends(actor)):
+    ctx = load_case_context(session, run_id); audit_read(session, role, "notice-drafts", ctx.case.id)
+    return {"banner": ctx.banner, "email": mailer.public_email_status(), "drafts": notices.drafts(ctx)}
+
+@app.post("/api/v1/investigations/{run_id}/notices")
+def create_notice(run_id: str, body: dict = Body(...), session=Depends(db), role=Depends(actor)):
+    require(role, INVESTIGATOR_ROLES)
+    ctx = load_case_context(session, run_id)
+    try: built = notices.create_notice(ctx, body)
+    except ValueError as e: raise HTTPException(422, str(e))
+    doc = _store_document(session, ctx, "vasp_notice", built["title"], "DRAFT", built["pdf"], built["sha256"], built["meta"], role)
+    return _doc_summary(doc)
+
+@app.get("/api/v1/investigations/{run_id}/documents")
+def list_documents(run_id: str, session=Depends(db), role=Depends(actor)):
+    run = _run(session, run_id); audit_read(session, role, "documents", run.case_id)
+    rows = session.scalars(select(GeneratedDocument).where(GeneratedDocument.case_id == run.case_id).order_by(GeneratedDocument.created_at.desc())).all()
+    return [_doc_summary(d) for d in rows]
+
+@app.get("/api/v1/documents/{document_id}")
+def get_document(document_id: str, session=Depends(db), role=Depends(actor)):
+    doc = _get_document(session, document_id); audit_read(session, role, "document", doc.case_id); return _doc_summary(doc)
+
+@app.get("/api/v1/documents/{document_id}/pdf")
+def document_pdf(document_id: str, download: bool = False, session=Depends(db), role=Depends(actor)):
+    doc = _get_document(session, document_id); audit_read(session, role, "document-pdf", doc.case_id)
+    name = f"{doc.kind}-{doc.id}.pdf"
+    return Response(doc.pdf, media_type="application/pdf", headers={"Content-Disposition": f'{"attachment" if download else "inline"}; filename="{name}"', "X-Document-SHA256": doc.sha256})
+
+@app.post("/api/v1/documents/{document_id}/send")
+def send_document(document_id: str, body: dict = Body(...), session=Depends(db), role=Depends(actor)):
+    require(role, INVESTIGATOR_ROLES)
+    doc = _get_document(session, document_id)
+    if doc.kind != "vasp_notice": raise HTTPException(422, "only VASP notices can be sent")
+    if body.get("confirmed") is not True: raise HTTPException(422, "confirm the recipient and contents before sending")
+    meta = dict(doc.meta or {})
+    channel = body.get("channel") or "email"
+    case = session.get(Case, doc.case_id)
+    if channel == "email":
+        recipient = str(body.get("recipientEmail") or meta.get("recipientEmail") or "").strip()
+        if not notices.EMAIL_RE.match(recipient): raise HTTPException(422, "a valid recipient e-mail address is required")
+        subject, text = notices.email_text(meta, case.number if case else doc.case_id)
+        try:
+            delivery = mailer.send_email(recipient, subject, text, doc.pdf, f"{meta.get('noticeNumber', doc.id).replace('/', '-')}.pdf")
+        except Exception as e:
+            log(session, role, "write", "vasp_notice", f"send-failed: {type(e).__name__}", doc.case_id)
+            raise HTTPException(502, f"e-mail delivery failed: {e}")
+        delivery["recipient"] = recipient
+    elif channel == "sahyog":
+        from app.sahyog_client import submit_notice
+        delivery = submit_notice(session, doc, role)
+    else:
+        raise HTTPException(422, "channel must be 'email' or 'sahyog'")
+    delivery["at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    delivery["by"] = role
+    meta["deliveries"] = [*(meta.get("deliveries") or []), delivery]
+    doc.meta = meta
+    doc.status = "SENT" if delivery.get("delivered") else "QUEUED_OUTBOX" if delivery.get("mode") == "outbox" else "SUBMITTED"
+    log(session, role, "write", "vasp_notice", f"{channel}:{doc.status}", doc.case_id)
+    return _doc_summary(doc)
