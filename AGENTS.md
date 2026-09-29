@@ -31,5 +31,6 @@ VAULT-X is an explainable, evidence-driven blockchain tracing and VASP-attributi
 
 ## Constraints
 
-- Add no heavy dependencies tonight: no Celery, Redis, Neo4j, or Postgres.
-- Use SQLite and networkx only.
+- No Celery or Redis.
+- PostgreSQL and Neo4j are permitted (constraint lifted by user override).
+- networkx may still be used for in-memory graph operations.

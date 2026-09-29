@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { Menu, X, LogOut, ChevronDown, LayoutList, Plus, Network, FileCheck2, Building2, ScrollText, FileText, Send, Bot } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Menu, X, LogOut, ChevronDown, LayoutList, Plus, Network, FileCheck2, Building2, ScrollText, FileText, Send, Bot, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 
-export type WorkspaceView = 'list' | 'create' | 'detail' | 'evidence' | 'vasp' | 'audit' | 'report' | 'sahyog';
+export type WorkspaceView = 'dashboard' | 'list' | 'create' | 'detail' | 'evidence' | 'vasp' | 'audit' | 'report' | 'sahyog';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -12,6 +12,7 @@ interface AppShellProps {
 }
 
 const navItems: { label: string; view: WorkspaceView; icon: React.ElementType }[] = [
+  { label: 'Dashboard', view: 'dashboard', icon: LayoutList }, // Using LayoutList for Dashboard as temporary since LayoutDashboard isn't imported
   { label: 'Case registry', view: 'list', icon: LayoutList },
   { label: 'Create case', view: 'create', icon: Plus },
   { label: 'Graph explorer', view: 'detail', icon: Network },
@@ -27,6 +28,13 @@ export function AppShell({ children, currentCaseId }: AppShellProps) {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [currentView, setCurrentView] = useState<WorkspaceView>('dashboard');
+
+  useEffect(() => {
+    const listener = (e: Event) => setCurrentView((e as CustomEvent<WorkspaceView>).detail);
+    window.addEventListener('vault-x:navigate', listener);
+    return () => window.removeEventListener('vault-x:navigate', listener);
+  }, []);
 
   const currentCase = null;
 
@@ -107,12 +115,24 @@ export function AppShell({ children, currentCaseId }: AppShellProps) {
         >
           <nav className="p-4 space-y-1">
             <div className="text-[10px] text-slate-600 font-mono uppercase tracking-[0.18em] mb-4 px-2">Operations</div>
-            {navItems.map(({ label, view, icon: Icon }) => (
-              <button key={view} onClick={() => navigate(view)} className="w-full flex items-center gap-3 text-left px-3 py-2 text-[11px] font-mono text-slate-400 hover:bg-slate-800/40 hover:text-teal-300 transition-colors">
-                <Icon size={14} strokeWidth={1.5} className="text-slate-600" />
-                <span>{label}</span>
-              </button>
-            ))}
+            {navItems.map(({ label, view, icon: Icon }) => {
+              if (Icon === LayoutList && view === 'dashboard') Icon = LayoutDashboard;
+              const isActive = currentView === view;
+              return (
+                <button 
+                  key={view} 
+                  onClick={() => navigate(view)} 
+                  className={`w-full flex items-center gap-3 text-left px-3 py-2 text-[11px] font-mono transition-colors ${
+                    isActive 
+                      ? 'bg-slate-800/50 border-l-2 border-cyan-700/60 text-slate-50' 
+                      : 'text-slate-400 hover:bg-slate-800/40 hover:text-teal-300'
+                  }`}
+                >
+                  <Icon size={14} strokeWidth={1.5} className={isActive ? 'text-cyan-400' : 'text-slate-600'} />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
             <div className="mt-8 border-t border-slate-800/80 pt-4 px-3">
               <button onClick={() => navigate('detail')} className="flex items-center gap-3 text-[11px] font-mono text-slate-500 hover:text-teal-300 transition-colors">
                 <Bot size={14} /> Investigator assistant
@@ -122,7 +142,18 @@ export function AppShell({ children, currentCaseId }: AppShellProps) {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 overflow-auto">{children}</div>
+        <div className="flex-1 flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden">
+          {/* Breadcrumb bar */}
+          <div className="h-8 border-b border-slate-800 bg-slate-900/40 flex items-center px-4 md:px-6">
+            <div className="font-mono text-[10px] text-slate-500 flex items-center gap-2">
+              <span className="text-slate-400">VAULT-X</span>
+              <span className="text-slate-600">/</span>
+              <span className="text-cyan-600/80 uppercase tracking-wider">{navItems.find(i => i.view === currentView)?.label || 'Workspace'}</span>
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-auto">{children}</div>
+        </div>
       </div>
     </div>
   );

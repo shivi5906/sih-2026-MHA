@@ -1,7 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Session, User } from './types';
+import { api } from './api';
 
 interface AuthContextType {
   session: Session | null;
@@ -17,28 +18,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
 
   const login = async (email: string, password: string, role: string) => {
-    // Mock login - in production, call real auth API
-    const mockUser: User = {
-      id: `user-${Date.now()}`,
-      name: email.split('@')[0],
-      email,
-      role: role as any,
-      avatar: `https://avatar.example.com/${email}`,
-    };
-
-    const mockToken = btoa(`${email}:${Date.now()}`);
-
-    setSession({
-      user: mockUser,
-      token: mockToken,
-    });
-    window.localStorage.setItem('vault-x-role', role);
+    try {
+      const response = await api.login(email, password, role);
+      
+      const { token, user } = response as { token: string; user: User };
+      
+      setSession({
+        user,
+        token,
+      });
+      
+      window.localStorage.setItem('vault-x-token', token);
+      window.localStorage.setItem('vault-x-role', role); // keep for backward compatibility
+    } catch (error) {
+      console.error('Login failed:', error);
+      throw error;
+    }
   };
 
   const logout = () => {
     setSession(null);
+    window.localStorage.removeItem('vault-x-token');
     window.localStorage.removeItem('vault-x-role');
   };
+
+  // Restore session on mount
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? window.localStorage.getItem('vault-x-token') : null;
+    if (token) {
+      api.me()
+        .then((user) => {
+          setSession({
+            user: user as User,
+            token
+          });
+        })
+        .catch(() => {
+          // Token invalid
+          logout();
+        });
+    }
+  }, []);
 
   return (
     <AuthContext.Provider

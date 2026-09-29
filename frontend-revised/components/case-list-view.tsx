@@ -1,27 +1,211 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import CytoscapeComponent from 'react-cytoscapejs';
-import { api, ApiOfflineError, Attribution, CaseSummary, GraphResponse } from '@/lib/api';
+
+import { useEffect, useState } from 'react';
+import { api, ApiOfflineError, CaseSummary } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-type View = 'list'|'create'|'detail'|'evidence'|'vasp'|'audit'|'report'|'sahyog';
-const Panel=({title,children}:{title:string;children:React.ReactNode})=><section className="border border-slate-800 bg-slate-950/70 p-4"><h2 className="mb-3 font-mono text-xs tracking-wider text-teal-400">{title}</h2>{children}</section>;
-export function CaseListView({ initialView='list' }: { initialView?: View }) {
- const [view,setView]=useState<View>(initialView),[cases,setCases]=useState<CaseSummary[]>([]),[runId,setRunId]=useState<string>(),[offline,setOffline]=useState(false);
- const load=()=>api.cases().then(setCases).catch(error=>setOffline(error instanceof ApiOfflineError));
- useEffect(()=>{ void load(); },[]);
- useEffect(()=>{const listener=(event:Event)=>setView((event as CustomEvent<View>).detail);window.addEventListener('vault-x:navigate',listener);return()=>window.removeEventListener('vault-x:navigate',listener)},[]);
- const open=async(item:CaseSummary)=>{try{setRunId((await api.startInvestigation(item.id)).id);setView('detail')}catch(error){setOffline(error instanceof ApiOfflineError)}};
- return <main className="min-h-screen bg-[#0a0b0d] p-6 text-slate-200"><div className="mb-4 border border-teal-900 bg-teal-950/30 p-2 font-mono text-xs text-teal-300">CASE REPLAY — BITFINEX 2016 PUBLIC DATASET</div>{offline&&<div className="mb-4 border border-amber-800 bg-amber-950/20 p-3 font-mono text-xs text-amber-300">API OFFLINE — live case data is unavailable; no mock data is displayed.</div>}
- {view==='list'&&<Panel title="CASE REGISTRY"><button className="mb-3 border border-teal-800 px-3 py-2 font-mono text-xs text-teal-300" onClick={()=>setView('create')}>CREATE CASE</button>{cases.map(item=><button className="block w-full border-t border-slate-800 py-3 text-left text-sm hover:text-teal-300" key={item.id} onClick={()=>open(item)}><span className="font-mono text-teal-500">{item.number}</span> · {item.title}</button>)}</Panel>}
- {view==='create'&&<Create onCreated={load}/>} {view==='detail'&&<Graph runId={runId}/>} {view==='evidence'&&<Evidence/>} {view==='vasp'&&<Vasps/>} {view==='audit'&&<Audit/>} {view==='report'&&<Reports runId={runId}/>} {view==='sahyog'&&<Sahyog attributionId="Xzzx.biz"/>}</main>;
+import { Dashboard } from './dashboard';
+import { NewCaseForm } from './new-case-form';
+import { GraphExplorer } from './graph-explorer';
+import { EvidenceRegister } from './evidence-register';
+import { AuditLog } from './audit-log';
+import { WorkspaceView } from './app-shell';
+
+const Panel = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <section className="border border-slate-800 bg-slate-950/70 p-4">
+    <h2 className="mb-3 font-mono text-xs tracking-wider text-teal-400">{title}</h2>
+    {children}
+  </section>
+);
+
+export function CaseListView({ initialView = 'dashboard' }: { initialView?: WorkspaceView | 'dashboard' }) {
+  const [view, setView] = useState<WorkspaceView | 'dashboard'>(initialView);
+  const [cases, setCases] = useState<CaseSummary[]>([]);
+  const [runId, setRunId] = useState<string>();
+  const [offline, setOffline] = useState(false);
+
+  const load = () => api.cases().then(setCases).catch(error => setOffline(error instanceof ApiOfflineError));
+  
+  useEffect(() => { void load(); }, []);
+  
+  useEffect(() => {
+    const listener = (event: Event) => setView((event as CustomEvent<WorkspaceView | 'dashboard'>).detail);
+    window.addEventListener('vault-x:navigate', listener);
+    return () => window.removeEventListener('vault-x:navigate', listener);
+  }, []);
+
+  useEffect(() => {
+    const listener = (event: Event) => setRunId((event as CustomEvent<string>).detail);
+    window.addEventListener('vault-x:set-run', listener);
+    return () => window.removeEventListener('vault-x:set-run', listener);
+  }, []);
+
+  const open = async (item: CaseSummary) => {
+    try {
+      const inv = await api.startInvestigation(item.id);
+      setRunId(inv.id);
+      setView('detail');
+    } catch (error) {
+      setOffline(error instanceof ApiOfflineError);
+    }
+  };
+
+  return (
+    <main className="min-h-screen p-4 md:p-6 text-slate-200">
+      <div className="mb-4 border border-teal-900 bg-teal-950/30 p-2 font-mono text-xs text-teal-300">
+        CASE REPLAY — BITFINEX 2016 PUBLIC DATASET
+      </div>
+      
+      {offline && (
+        <div className="mb-4 border border-amber-800 bg-amber-950/20 p-3 font-mono text-xs text-amber-300">
+          API OFFLINE — live case data is unavailable; no mock data is displayed.
+        </div>
+      )}
+      
+      {view === 'dashboard' && <Dashboard />}
+      
+      {view === 'list' && (
+        <Panel title="CASE REGISTRY">
+          <div className="mb-4 flex justify-between items-center">
+            <h3 className="text-sm font-medium text-slate-300">Active Investigations</h3>
+            <button 
+              className="border border-teal-600 bg-teal-950/30 px-4 py-2 font-mono text-xs font-bold tracking-wider text-teal-300 hover:bg-teal-900/40 transition-colors" 
+              onClick={() => setView('create')}
+            >
+              ⚡ NEW INVESTIGATION
+            </button>
+          </div>
+          
+          <div className="overflow-hidden rounded border border-slate-800">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-900/80 font-mono text-[10px] text-cyan-400">
+                <tr>
+                  <th className="p-3">CASE ID</th>
+                  <th className="p-3">TITLE</th>
+                  <th className="p-3">STATUS</th>
+                  <th className="p-3 text-right">ACTION</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 bg-slate-950/30">
+                {cases.map(item => (
+                  <tr key={item.id} className="hover:bg-slate-800/40 group">
+                    <td className="p-3 font-mono text-teal-400">{item.number}</td>
+                    <td className="p-3 text-slate-300 group-hover:text-cyan-300 transition-colors">{item.title}</td>
+                    <td className="p-3">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-800/50 bg-teal-950/30 px-2 py-0.5 text-[10px] text-teal-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-teal-500"></span>
+                        {item.status.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      <button 
+                        className="text-xs font-mono text-cyan-500 hover:text-cyan-300 transition-colors"
+                        onClick={() => open(item)}
+                      >
+                        OPEN →
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {cases.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-sm text-slate-500">
+                      No cases found. Create a new case to begin tracing.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+      )}
+      
+      {view === 'create' && <NewCaseForm onCreated={load} />} 
+      {view === 'detail' && <GraphExplorer runId={runId} />} 
+      {view === 'evidence' && <EvidenceRegister />} 
+      {view === 'vasp' && <Vasps />} 
+      {view === 'audit' && <AuditLog />} 
+      {view === 'report' && <Reports runId={runId} />} 
+      {view === 'sahyog' && <Sahyog attributionId="Xzzx.biz" />}
+    </main>
+  );
 }
-function Create({onCreated}:{onCreated:()=>void}){const [title,setTitle]=useState('');return <Panel title="CREATE CASE"><input className="border border-slate-700 bg-slate-900 p-2 text-sm" value={title} onChange={e=>setTitle(e.target.value)} placeholder="Case title"/><button className="ml-2 border border-teal-800 p-2 text-xs" onClick={async()=>{await api.createCase(`CASE-${Date.now()}`,title);onCreated()}}>SAVE</button></Panel>}
-function Graph({runId}:{runId?:string}){const [graph,setGraph]=useState<GraphResponse>({nodes:[],edges:[],banner:''}),[items,setItems]=useState<Attribution[]>([]),[error,setError]=useState(''),[selected,setSelected]=useState<Record<string,unknown>|null>(null),[tab,setTab]=useState<'attribution'|'challenge'|'replay'>('attribution'),[min,setMin]=useState('0'),[label,setLabel]=useState(''),[drawer,setDrawer]=useState(false),cyRef=useRef<any>(null);useEffect(()=>{if(runId){setError('');void Promise.all([api.graph(runId).then(setGraph),api.attribution(runId).then(setItems)]).catch(()=>setError('Unable to load the case graph.'))}},[runId]);const focusOptions=useMemo(()=>graph.nodes.filter(n=>n.id.startsWith('virtual:')||n.label==='Xzzx.biz'),[graph.nodes]);const elements=useMemo(()=>{const amount=Number(min);const amountFloor=Number.isFinite(amount)&&amount>=0?amount:0;const matching=new Set(graph.nodes.filter(n=>!label||n.label===label).map(n=>n.id));const edges=graph.edges.filter(e=>Number(e.data?.amount ?? 0)>=amountFloor&&(!label||matching.has(e.source)||matching.has(e.target)));const connected=new Set(edges.flatMap(e=>[e.source,e.target]));return [...graph.nodes.filter(n=>connected.has(n.id)).map(n=>({data:{id:n.id,label:n.label,...n.data},classes:n.id.startsWith('virtual:')?'virtual aggregate':''})),...edges.map(e=>({data:{id:e.id,source:e.source,target:e.target,...e.data},classes:e.epistemicLabel==='CASE_ASSERTED'?'asserted':''}))]},[graph,label,min]);const reset=()=>{setMin('0');setLabel('');setSelected(null)};const zoom=(factor:number)=>cyRef.current?.zoom(cyRef.current.zoom()*factor);return <div className="grid gap-4 lg:grid-cols-[1fr_320px]"><Panel title="GRAPH EXPLORER"><div className="mb-3 grid gap-2 md:grid-cols-[170px_1fr_auto]"><label className="font-mono text-[10px] text-cyan-200">MINIMUM BTC<input aria-label="Minimum BTC" className="mt-1 block w-full border border-cyan-500 bg-slate-950 p-2 text-sm text-white" type="number" min="0" value={min} onChange={e=>setMin(e.target.value)} placeholder="0"/></label><label className="font-mono text-[10px] text-cyan-200">FOCUS LABEL<select aria-label="Focus label" className="mt-1 block w-full border border-cyan-500 bg-slate-950 p-2 text-sm text-white" value={label} onChange={e=>setLabel(e.target.value)}><option value="">All transfers — recommended</option>{focusOptions.map(node=><option key={node.id} value={node.label}>{node.label}</option>)}</select></label><button className="self-end border border-cyan-400 bg-cyan-950 px-3 py-2 font-mono text-xs text-cyan-100 hover:bg-cyan-800" onClick={reset}>RESET FILTERS</button></div>{error?<p className="text-xs text-amber-300">{error}</p>:<><div className="mb-3 grid grid-cols-3 gap-2 font-mono text-[10px]"><div className="border border-cyan-800 bg-cyan-950/30 p-2 text-cyan-100"><b>{graph.renderedEdges??graph.edges.length}</b><br/>VISIBLE TRANSFERS</div><div className="border border-sky-800 bg-sky-950/30 p-2 text-sky-100"><b>{graph.nodes.length}</b><br/>VISIBLE ADDRESSES</div><div className="border border-amber-700 bg-amber-950/30 p-2 text-amber-100"><b>UNCALIBRATED</b><br/>CASE REPLAY</div></div><div className="mb-2 flex flex-wrap items-center gap-3 font-mono text-[10px] text-slate-200"><span><i className="mr-1 inline-block h-2 w-2 rotate-45 bg-yellow-300"/> Dataset source</span><span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-cyan-300"/> Address</span><span><i className="mr-1 inline-block h-px w-4 bg-sky-400"/> Recorded transfer</span><button className="ml-auto border border-slate-600 px-2 py-1 hover:bg-slate-800" onClick={()=>cyRef.current?.fit(undefined,40)}>FIT</button><button className="border border-slate-600 px-2 py-1 hover:bg-slate-800" onClick={()=>zoom(1.2)}>+</button><button className="border border-slate-600 px-2 py-1 hover:bg-slate-800" onClick={()=>zoom(.8)}>−</button></div><p className="mb-2 font-mono text-[11px] text-cyan-200">Start with Minimum BTC = 0 and All transfers. Select a source to focus it; click an address to inspect it.</p><p className="mb-2 font-mono text-[10px] text-slate-300">{graph.banner} · showing {graph.renderedEdges??graph.edges.length} of {graph.totalEdges??graph.edges.length} representative recorded transfers{graph.truncated?' to keep the browser responsive.':''}</p>{elements.length===0?<div className="flex h-[460px] items-center justify-center border border-amber-500 bg-amber-950/30 p-6 text-center font-mono text-sm text-amber-100">No transfers match these filters. Select RESET FILTERS to show the graph.</div>:<CytoscapeComponent elements={elements} layout={{name:'grid',padding:40,animate:false} as never} style={{height:'500px',width:'100%',background:'#020617'}} stylesheet={[{selector:'node',style:{label:'data(label)',color:'#ffffff','font-size':10,'font-weight':'bold','text-outline-color':'#020617','text-outline-width':2,'background-color':'#22d3ee','border-width':2,'border-color':'#e0f2fe','width':18,'height':18}},{selector:'node.virtual',style:{'background-color':'#facc15',shape:'diamond','border-color':'#ffffff','width':28,'height':28}},{selector:'node.aggregate',style:{'border-width':3,'border-color':'#fef08a'}},{selector:'edge',style:{width:2,'line-color':'#38bdf8','target-arrow-color':'#38bdf8','target-arrow-shape':'triangle','curve-style':'bezier',opacity:0.9}},{selector:'edge.asserted',style:{'line-style':'dashed','line-color':'#facc15','target-arrow-color':'#facc15'}}]} cy={cy=>{cyRef.current=cy;cy.off('tap','node');cy.on('tap','node',event=>setSelected(event.target.data()))}}/>}</>}</Panel><Panel title="INVESTIGATION"><div className="mb-3 border border-slate-700 bg-slate-900 p-3 text-xs text-slate-200">Selected address: <b className="text-cyan-200">{String(selected?.label||'none')}</b><br/><span className="text-slate-400">{selected?.address?`Address: ${String(selected.address)}`:'Click a graph node to view its address.'}</span></div><div className="flex gap-2 border-b border-slate-800 pb-2">{(['attribution','challenge','replay'] as const).map(t=><button key={t} onClick={()=>setTab(t)} className="font-mono text-[10px] text-teal-400">{t.toUpperCase()}</button>)}</div>{tab==='attribution'&&<AttributionPanel items={items} drawer={drawer} setDrawer={setDrawer}/>} {tab==='challenge'&&<Challenge items={items}/>} {tab==='replay'&&<Replay/>}</Panel></div>}
-function AttributionPanel({items,drawer,setDrawer}:{items:Attribution[];drawer:boolean;setDrawer:(value:boolean)=>void}){const top=items[0];return <div className="space-y-3 pt-3"><span className="border border-amber-800 px-2 py-1 font-mono text-[10px] text-amber-300">UNCALIBRATED</span>{top?<><p className="text-sm">{top.hypothesis} · {Number(top.score).toFixed(2)} · {top.band}</p><p className="text-xs text-slate-500">{top.epistemicLabel==='NO_ATTRIBUTION'?'ABSTAINED: no attribution.':'Single tier-C source; not confirmed.'}</p><button className="border border-teal-800 p-2 text-[10px]" onClick={()=>setDrawer(!drawer)}>WHY THIS VASP?</button>{drawer&&<div className="border border-slate-800 p-2 text-xs">{top.supporting.map(id=><button key={id} className="block text-teal-400">{id} · OBSERVED / ATTRIBUTED</button>)}</div>}</>:<p className="text-xs text-slate-500">No attribution data.</p>}</div>}
-function Challenge({items}:{items:Attribution[]}){const top=items[0];return <div className="space-y-3 pt-3 text-xs"><p>Alternatives: {items.slice(1).map(x=>x.hypothesis).join(', ')||'NO_ATTRIBUTION'}</p><p>Contradicting evidence: {top?.contradicting.join(', ')||'none'}</p><p>Evidence gaps: {top?.nextActions.join(' ')||'Second independent source required.'}</p><p className="text-amber-300">Sensitivity: removing the tier-C label changes the conclusion to NO_ATTRIBUTION.</p></div>}
-function Replay(){const [step,setStep]=useState(1);return <div className="pt-3 text-xs"><input className="w-full accent-teal-600" type="range" min="1" max="3" value={step} onChange={e=>setStep(Number(e.target.value))}/><p className="mt-2">Step {step}: SNAPSHOT / CASE REPLAY trace event.</p></div>}
-function Evidence(){const [rows,setRows]=useState<Array<Record<string,unknown>>>([]),[result,setResult]=useState('');useEffect(()=>{api.evidence().then(setRows)},[]);return <Panel title="EVIDENCE REGISTER">{rows.map(row=><div key={String(row.id)} className="border-t border-slate-800 py-2 text-xs"><button className="text-teal-400" onClick={async()=>{const r=await api.verifyEvidence(String(row.id));setResult(r.valid?'OK':`broken-at-${r.firstBrokenLink}`)}}>VERIFY CHAIN</button> · {String(row.id)} · {String(row.type)}</div>)}<p className="mt-2 font-mono text-teal-300">{result}</p></Panel>}
-function Vasps(){const [items,setItems]=useState<Array<Record<string,unknown>>>([]);useEffect(()=>{api.vasps().then(result=>setItems(result.items))},[]);return <Panel title="VASP INTELLIGENCE">{items.map(x=><p key={String(x.name)} className="text-xs">{String(x.name)} · source: {String(x.sourceTier)} · tier C / unverified</p>)}</Panel>}
-function Audit(){const {user}=useAuth();const [items,setItems]=useState<Array<Record<string,unknown>>>([]),[error,setError]=useState(''),[loading,setLoading]=useState(false);const load=()=>{setLoading(true);setError('');api.audit().then(setItems).catch(err=>setError(String(err).includes('403')?'Audit access requires an Auditor or Supervisor login.':'Unable to load the audit log.')).finally(()=>setLoading(false))};useEffect(()=>{void load()},[]);return <Panel title="AUDIT LOG"><div className="mb-3 flex items-center justify-between border border-slate-700 bg-slate-900 p-3 text-xs"><span>Current role: <b className="text-cyan-200">{user?.role||'Unknown'}</b></span><button className="border border-cyan-500 px-3 py-1 font-mono text-[10px] text-cyan-100 hover:bg-cyan-950" onClick={load}>REFRESH</button></div>{error?<div className="border border-amber-600 bg-amber-950/30 p-3 text-xs text-amber-100">{error}</div>:loading?<p className="text-xs text-slate-400">Loading audit events…</p>:items.length===0?<p className="text-xs text-slate-400">No audit events recorded.</p>:<div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="border-b border-slate-700 font-mono text-[10px] text-cyan-300"><tr><th className="p-2">TIME</th><th className="p-2">ACTOR</th><th className="p-2">ACTION</th><th className="p-2">RESOURCE</th><th className="p-2">RESULT</th></tr></thead><tbody>{items.map(x=><tr key={String(x.id)} className="border-b border-slate-800 text-slate-200"><td className="p-2 whitespace-nowrap text-slate-400">{x.occurredAt?new Date(String(x.occurredAt)).toLocaleString():'—'}</td><td className="p-2">{String(x.who)}</td><td className="p-2 text-cyan-200">{String(x.what)}</td><td className="p-2">{String(x.resource)}</td><td className="p-2 text-emerald-300">{String(x.result)}</td></tr>)}</tbody></table></div>}</Panel>}
-function Reports({runId}:{runId?:string}){const [items,setItems]=useState<Array<Record<string,unknown>>>([]);return <Panel title="REPORTS"><button className="border border-teal-800 p-2 text-xs" onClick={()=>runId&&api.reports(runId).then(setItems)}>GENERATE / LOAD JSON</button><button className="ml-2 border border-slate-700 p-2 text-xs" onClick={()=>window.open('http://localhost:8000/api/v1/reports/REPORT-CYBER-2026-001/html')}>OPEN HTML</button><button className="ml-2 border border-slate-700 p-2 text-xs" onClick={()=>{const blob=new Blob([JSON.stringify(items)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='vaultx-report.json';a.click()}}>DOWNLOAD JSON</button></Panel>}
-function Sahyog({attributionId}:{attributionId:string}){const {user}=useAuth();const [reply,setReply]=useState<Record<string,unknown>|null>(null);return <Panel title="SAHYOG: MOCK"><p className="mb-3 text-xs text-amber-300">MOCK — not submitted to any government system.</p><button className="border border-teal-800 p-2 text-xs" onClick={()=>api.prepareSahyog(attributionId).then(setReply)}>PREPARE MOCK</button>{user?.role==='Supervisor'&&<button className="ml-2 border border-amber-800 p-2 text-xs" onClick={()=>api.approveSahyog(attributionId).then(setReply)}>SUPERVISOR APPROVE</button>}<pre className="mt-3 text-[10px] text-slate-500">{reply&&JSON.stringify(reply,null,2)}</pre></Panel>}
+
+function Vasps() {
+  const [items, setItems] = useState<Array<Record<string, unknown>>>([]);
+  useEffect(() => { api.vasps().then(result => setItems(result.items)) }, []);
+  return (
+    <Panel title="VASP INTELLIGENCE">
+      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+        {items.map(x => (
+          <div key={String(x.name)} className="border border-slate-700 bg-slate-900 p-3">
+            <h3 className="font-bold text-cyan-300 mb-1">{String(x.name)}</h3>
+            <div className="font-mono text-[10px] text-slate-400 space-y-1">
+              <p>Source: <span className="text-slate-300">{String(x.sourceTier)}</span></p>
+              <p>Status: <span className="text-amber-400">TIER C / UNVERIFIED</span></p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function Reports({ runId }: { runId?: string }) {
+  const [items, setItems] = useState<Array<Record<string, unknown>>>([]);
+  return (
+    <Panel title="REPORTS">
+      <div className="flex gap-3 mb-4">
+        <button className="border border-teal-800 bg-teal-950/30 px-4 py-2 text-xs font-mono text-teal-300 hover:bg-teal-900/50 transition-colors" onClick={() => runId && api.reports(runId).then(setItems)}>
+          GENERATE / LOAD JSON
+        </button>
+        <button className="border border-slate-700 bg-slate-800/50 px-4 py-2 text-xs font-mono text-slate-300 hover:bg-slate-700 transition-colors" onClick={() => window.open('http://localhost:8000/api/v1/reports/REPORT-CYBER-2026-001/html')}>
+          OPEN HTML
+        </button>
+        <button className="border border-slate-700 bg-slate-800/50 px-4 py-2 text-xs font-mono text-slate-300 hover:bg-slate-700 transition-colors" onClick={() => {
+          const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'vaultx-report.json';
+          a.click();
+        }}>
+          DOWNLOAD JSON
+        </button>
+      </div>
+      {items.length > 0 && (
+        <pre className="border border-slate-800 bg-slate-900 p-4 text-[10px] font-mono text-slate-400 overflow-auto max-h-96">
+          {JSON.stringify(items, null, 2)}
+        </pre>
+      )}
+    </Panel>
+  );
+}
+
+function Sahyog({ attributionId }: { attributionId: string }) {
+  const { user } = useAuth();
+  const [reply, setReply] = useState<Record<string, unknown> | null>(null);
+  return (
+    <Panel title="SAHYOG: MOCK">
+      <div className="mb-4 border-l-2 border-amber-500 bg-amber-950/20 p-3 text-sm text-amber-200">
+        <strong className="font-mono text-xs">MOCK MODE ACTIVE:</strong> Data is not submitted to any government system. SAHYOG integration is simulated.
+      </div>
+      <div className="flex gap-3">
+        <button className="border border-teal-600 bg-teal-950/40 px-4 py-2 text-xs font-mono font-bold text-teal-300 hover:bg-teal-900/60 transition-colors" onClick={() => api.prepareSahyog(attributionId).then(setReply)}>
+          PREPARE MOCK SUBMISSION
+        </button>
+        {user?.role === 'Supervisor' && (
+          <button className="border border-amber-600 bg-amber-950/40 px-4 py-2 text-xs font-mono font-bold text-amber-300 hover:bg-amber-900/60 transition-colors" onClick={() => api.approveSahyog(attributionId).then(setReply)}>
+            SUPERVISOR APPROVE
+          </button>
+        )}
+      </div>
+      {reply && (
+        <div className="mt-4">
+          <h3 className="font-mono text-[10px] text-slate-500 mb-2 uppercase">Mock Response Payload</h3>
+          <pre className="border border-slate-800 bg-slate-900 p-4 text-[10px] font-mono text-emerald-400 overflow-auto">
+            {JSON.stringify(reply, null, 2)}
+          </pre>
+        </div>
+      )}
+    </Panel>
+  );
+}

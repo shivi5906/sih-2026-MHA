@@ -14,15 +14,19 @@ const roles: { value: UserRole; label: string }[] = [
 export function LoginScreen() {
   const { login } = useAuth();
   const [email, setEmail] = useState('analyst@vault.local');
-  const [password, setPassword] = useState('••••••••');
+  const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('Analyst');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
     try {
       await login(email, password, selectedRole);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Authentication failed');
     } finally {
       setIsLoading(false);
     }
@@ -72,6 +76,7 @@ export function LoginScreen() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 bg-slate-900 border border-slate-700/50 text-sm font-mono text-slate-50 focus:outline-none focus:border-cyan-700/70 transition-colors"
+              placeholder="Enter password"
             />
           </div>
 
@@ -96,6 +101,12 @@ export function LoginScreen() {
             </div>
           </div>
 
+          {error && (
+            <div className="text-red-400 text-xs font-mono bg-red-950/30 border border-red-900/50 p-2 mt-4 text-center">
+              {error}
+            </div>
+          )}
+
           {/* Submit */}
           <button
             type="submit"
@@ -109,7 +120,7 @@ export function LoginScreen() {
         {/* Footer info */}
         <div className="text-center text-xs text-slate-600 font-mono space-y-1">
           <p>Demo Credentials</p>
-          <p className="text-slate-700">Use any role to proceed</p>
+          <p className="text-slate-700">Demo password: vaultx</p>
         </div>
       </div>
 
