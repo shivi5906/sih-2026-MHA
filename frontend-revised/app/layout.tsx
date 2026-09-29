@@ -4,9 +4,8 @@ import './globals.css'
 import { AuthProvider } from '@/lib/auth-context'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'VaultX',
+  description: 'VaultX - Digital Forensics Suite',
   icons: {
     icon: [
       {
