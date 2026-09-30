@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 app=FastAPI(title="VAULT-X", version="0.1.0")
 MAX_RENDERED_GRAPH_EDGES = 200
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000", "http://localhost:3001"], allow_methods=["*"], allow_headers=["*"])
 @app.on_event("startup")
 def startup():
     init_db()

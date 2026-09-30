@@ -51,7 +51,7 @@ class Config:
                 rate_limit_qps=3,
             ),
             "bitcoin": ChainConfig(
-                api_base_url="https://blockstream.info/api",
+                api_base_url="https://mempool.space/api",
                 api_key=None,
                 rate_limit_qps=3,
             ),
