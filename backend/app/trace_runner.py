@@ -164,18 +164,30 @@ async def run_trace(
         
         data = load_case_data()
         
+        import uuid
+        
         # Insert all transactions
         for tx in data.transactions:
-            session.add(Transaction(id=tx.id, case_id=case_id, payload=tx.model_dump(by_alias=True, mode="json")))
+            tx_payload = tx.model_dump(by_alias=True, mode="json")
+            tx_id = f"TX-{case_id[:8]}-{tx.id[:12]}-{uuid.uuid4().hex[:8]}"
+            tx_payload["id"] = tx_id
+            session.add(Transaction(id=tx_id, case_id=case_id, payload=tx_payload))
             
         # Insert hypotheses and evidence
         labeled = next((tx for tx in data.january_transactions if tx.metadata and tx.metadata.get("peerName")), None)
         if labeled:
             hypotheses, evidence = ranked_hypotheses(labeled, data.january_transactions)
             for item in evidence:
-                append_evidence(session, case_id, item.model_dump(by_alias=True, mode="json"), {"tx": item.tx_refs[0]}, item.id)
+                ev_id = f"EV-{uuid.uuid4().hex[:12]}"
+                item_dump = item.model_dump(by_alias=True, mode="json")
+                item_dump["id"] = ev_id
+                append_evidence(session, case_id, item_dump, {"tx": item.tx_refs[0]}, ev_id)
             for item in hypotheses:
-                session.add(HypothesisRecord(id=item.id, case_id=case_id, payload=item.model_dump(by_alias=True, mode="json")))
+                hyp_id = f"HYP-{uuid.uuid4().hex[:12]}"
+                item_dump = item.model_dump(by_alias=True, mode="json")
+                item_dump["id"] = hyp_id
+                item_dump["caseId"] = case_id
+                session.add(HypothesisRecord(id=hyp_id, case_id=case_id, payload=item_dump))
         else:
             hypotheses = []
                 
